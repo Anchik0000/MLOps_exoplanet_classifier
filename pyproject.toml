@@ -4,15 +4,20 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "asyncpg>=0.31.0",
-    "fastapi>=0.141.1",
-    "uvicorn>=0.53.0",
-]
+dependencies = ["asyncpg>=0.31.0", "fastapi>=0.141.1", "uvicorn>=0.53.0"]
 
 [dependency-groups]
-dev = [
-    "pre-commit>=4.6.2",
-    "pytest>=9.1.1",
-    "ruff>=0.16.8",
-]
+dev = ["pre-commit>=4.6.2", "pytest>=9.1.1", "ruff>=0.16.8"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "BLE"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
