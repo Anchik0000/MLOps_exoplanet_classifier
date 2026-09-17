@@ -16,5 +16,5 @@ def get_app_version() -> str:
 
 
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/mlpops"
+    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/exoplanet_classifier"
 )

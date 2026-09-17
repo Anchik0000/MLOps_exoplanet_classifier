@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: exoplanet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: exoplanet_classifier
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - exoplanet_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d exoplanet_classifier"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: exoplanet_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/exoplanet_classifier"
+      PORT: 8000
+    networks:
+      - exoplanet_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  exoplanet_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
