@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["asyncpg>=0.31.0", "fastapi>=0.141.1", "uvicorn>=0.53.0"]
+dependencies = [
+    "asyncpg>=0.31.0",
+    "fastapi>=0.141.1",
+    "structlog>=26.1.0",
+    "uvicorn>=0.53.0",
+]
 
 [dependency-groups]
 dev = [
