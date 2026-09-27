@@ -1,17 +1,21 @@
 import time
 
 import asyncpg
+import structlog
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
 from src.config import DATABASE_URL, get_app_version
 
+logger = structlog.get_logger()
 router = APIRouter(tags=["Health & Monitoring"])
 
 
 @router.get("/version")
 async def get_version() -> dict[str, str]:
-    return {"version": get_app_version()}
+    version = get_app_version()
+    logger.info("version_requested", returned_version=version)
+    return {"version": version}
 
 
 @router.get("/health")
@@ -31,8 +35,15 @@ async def detailed_health_check() -> JSONResponse:
     except (asyncpg.PostgresError, OSError, TimeoutError) as exc:
         db_status = "unavailable"
         error_detail = str(exc)
+        logger.error("database_connection_failed", error=error_detail)
 
     latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+
+    logger.info(
+        "health_check_completed",
+        db_status=db_status,
+        latency_ms=latency_ms,
+    )
 
     response_payload = {
         "status": "healthy" if db_status == "ok" else "unhealthy",

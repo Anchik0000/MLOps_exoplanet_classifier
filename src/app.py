@@ -1,7 +1,10 @@
+import structlog
 from fastapi import FastAPI
 
 from src.api.v1.health import router as health_v1_router
 from src.config import get_app_version
+
+logger = structlog.get_logger()
 
 
 def create_app() -> FastAPI:
@@ -13,6 +16,7 @@ def create_app() -> FastAPI:
 
     @app.get("/healthz", tags=["Probes"])
     async def healthz() -> dict[str, str]:
+        logger.info("liveness_probe_called", endpoint="/healthz", status="ok")
         return {"status": "ok"}
 
     app.include_router(health_v1_router, prefix="/api/v1")
