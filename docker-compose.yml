@@ -16,7 +16,7 @@ services:
     networks:
       - exoplanet_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d exoplanet_classifier"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d exoplanet_classifier" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -59,9 +59,44 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  mlflow_db:
+    image: postgres:16-alpine
+    container_name: mlflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow_password
+      POSTGRES_DB: mlflow_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - mlflow_db_data:/var/lib/postgresql/data
+    networks:
+      - exoplanet_network
+
+  mlflow_server:
+    image: ghcr.io/mlflow/mlflow:v2.11.1
+    container_name: mlflow_server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://mlflow:mlflow_password@mlflow_db:5432/mlflow_db
+      - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
+    volumes:
+      - mlflow_artifact_data:/mlflow/artifacts
+    command: >
+      bash -c "pip install psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql+psycopg2://mlflow:mlflow_password@mlflow_db:5432/mlflow_db --default-artifact-root /mlflow/artifacts"
+    networks:
+      - exoplanet_network
+    depends_on:
+      - mlflow_db
+
 networks:
   exoplanet_network:
     driver: bridge
 
 volumes:
   postgres_data:
+  mlflow_db_data:
+  mlflow_artifact_data:
