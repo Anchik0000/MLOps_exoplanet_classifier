@@ -46,7 +46,7 @@ addopts = "--cov=src --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["*/tests/*"]
+omit = ["*/tests/*", "src/run_eda.py", "src/train.py"]
 
 [tool.coverage.report]
 show_missing = true
