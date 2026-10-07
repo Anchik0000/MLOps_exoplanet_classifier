@@ -82,16 +82,14 @@ services:
       - "5000:5000"
     environment:
       - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://mlflow:mlflow_password@mlflow_db:5432/mlflow_db
-      - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
     volumes:
-      - mlflow_artifact_data:/mlflow/artifacts
+      - ./mlflow_artifacts:/mlflow/artifacts
     networks:
       - exoplanet_network
     depends_on:
       - mlflow_db
     command: >
-      bash -c "pip install psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql+psycopg2://mlflow:mlflow_password@mlflow_db:5432/mlflow_db --default-artifact-root /mlflow/artifacts --serve-artifacts"
-
+      bash -c "pip install psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql+psycopg2://mlflow:mlflow_password@mlflow_db:5432/mlflow_db --default-artifact-root mlflow-artifacts:/ --artifacts-destination /mlflow/artifacts --serve-artifacts"
 networks:
   exoplanet_network:
     driver: bridge

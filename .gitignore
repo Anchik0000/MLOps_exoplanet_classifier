@@ -21,3 +21,4 @@ venv.bak/
 
 data/
 artifacts/
+/mlflow_artifacts/
