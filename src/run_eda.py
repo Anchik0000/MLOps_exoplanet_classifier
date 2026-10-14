@@ -1,4 +1,5 @@
 import hashlib
+import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -6,8 +7,8 @@ import mlflow
 import pandas as pd
 import seaborn as sns
 
-mlflow.set_tracking_uri("http://localhost:5000")
-mlflow.set_experiment("Kepler_Exoplanet_EDA")
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+mlflow.set_experiment("Kepler_Exoplanet_EDA_v2")
 
 DATA_PATH = Path("data/raw/cumulative.csv")
 
@@ -75,10 +76,30 @@ def main():
             if not col.endswith(("_err1", "_err2"))
             and not col.startswith(("kepid", "rowid"))
             and col not in ["koi_score"]
+            and df_target_clean[col].nunique(dropna=True) > 1
         ]
 
-        corr_matrix = df_target_clean[astro_features].corr()
-        fig2, ax2 = plt.subplots(figsize=(14, 11))
+        key_features = [
+            col
+            for col in [
+                "koi_period",
+                "koi_duration",
+                "koi_depth",
+                "koi_impact",
+                "koi_prad",
+                "koi_teq",
+                "koi_insol",
+                "koi_model_snr",
+                "koi_steff",
+                "koi_slogg",
+                "koi_srad",
+                "koi_kepmag",
+            ]
+            if col in astro_features
+        ]
+
+        corr_matrix = df_target_clean[key_features].corr()
+        fig2, ax2 = plt.subplots(figsize=(12, 9))
         sns.heatmap(
             corr_matrix,
             annot=True,
@@ -90,7 +111,7 @@ def main():
             ax=ax2,
         )
         ax2.set_title(
-            "Матрица корреляций очищенных астрофизических параметров",
+            "Матрица корреляций ключевых астрофизических параметров",
             fontsize=14,
             pad=15,
         )
