@@ -75,7 +75,7 @@ services:
       - exoplanet_network
 
   mlflow_server:
-    image: ghcr.io/mlflow/mlflow:v2.11.1
+    image: ghcr.io/mlflow/mlflow:v3.17.0
     container_name: mlflow_server
     restart: unless-stopped
     ports:
