@@ -18,3 +18,9 @@ def get_app_version() -> str:
 DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/exoplanet_classifier"
 )
+
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MODEL_NAME = os.getenv("MODEL_NAME", "kepler_exoplanet_classifier")
+MODEL_ALIAS = os.getenv("MODEL_ALIAS", "champion")
+MODEL_LOAD_ATTEMPTS = int(os.getenv("MODEL_LOAD_ATTEMPTS", "5"))
+MODEL_LOAD_DELAY_SECONDS = float(os.getenv("MODEL_LOAD_DELAY_SECONDS", "3"))
