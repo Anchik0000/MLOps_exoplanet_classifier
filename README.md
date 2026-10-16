@@ -22,7 +22,8 @@ Exoplanet Classifier решает эту задачу: по данным наб�
 
 ## Текущий статус
 
-Сейчас готова инфраструктура сервиса, ML-модель в разработке.
+Готова инфраструктура сервиса и базовый ML-пайплайн: данные, эксперименты, модели и приложение,
+которое отдаёт предсказания.
 
 Что уже есть:
 
@@ -35,10 +36,12 @@ Exoplanet Classifier решает эту задачу: по данным наб�
 - CI: проверка форматирования, линтер и тесты на каждый push и pull request
 - CD: сборка и публикация Docker-образа в реестр, версионирование образов
 - логирование через structlog
+- MLflow: Tracking Server, EDA, отслеживание датасета, эксперименты, Model Registry
+- `POST /process`: предсказание моделью, загруженной из MLflow при старте приложения
 
 ## Технологии
 
-Python 3.11, uv, FastAPI, Uvicorn, PostgreSQL 16, asyncpg, structlog, pytest, ruff, pre-commit, Docker, GitHub Actions
+Python 3.11, uv, FastAPI, Uvicorn, PostgreSQL 16, asyncpg, structlog, MLflow, scikit-learn, pandas, pytest, ruff, pre-commit, Docker, GitHub Actions
 
 ## Quick start
 
@@ -91,10 +94,60 @@ uv run python main.py
 - `GET /healthz` - быстрая проверка, что приложение живо и отвечает
 - `GET /api/v1/version` - версия приложения (берётся из `pyproject.toml`)
 - `GET /api/v1/health` - проверка сторонних компонентов: статус и версия PostgreSQL, время ответа
+- `POST /process` - предсказание по признакам кандидата, подробнее в разделе про MLflow
 
 Почему `/healthz` без `/api/v1`: это просто проверка, что приложение живо, её могут использовать
 docker и мониторинг. К версии API она не относится, поэтому адрес у неё всегда один и тот же,
 даже если потом появится `/api/v2`.
+
+## MLflow
+
+MLflow Tracking Server поднимается через docker compose: сервер, база PostgreSQL как Backend Store
+и папка `mlflow_artifacts` как Artifact Store (файлы отдаёт сам сервер). Интерфейс доступен на
+http://localhost:5000.
+
+```bash
+docker compose up -d mlflow_db mlflow_server
+```
+
+Датасет `cumulative.csv` (таблица кандидатов Kepler) кладём в `data/raw/`, в git он не попадает.
+
+```bash
+uv run python src/run_eda.py   # EDA: графики и параметры, датасет регистрируется в MLflow
+uv run python -m src.train     # baseline и два варианта модели, регистрация в Model Registry
+```
+
+Если порт 5000 занят (на macOS его занимает AirPlay Receiver), адрес сервера можно задать
+переменной `MLFLOW_TRACKING_URI`.
+
+Что получается в MLflow:
+
+- датасет `Kepler_Raw_Data` с `source` (путь к файлу) и `digest` (хэш файла), он связан с запусками
+  EDA и обучения
+- эксперименты `Kepler_Exoplanet_EDA_v2` и `Kepler_Astrobiology_Hybrid_Model` с параметрами,
+  метриками и артефактами
+- модель `kepler_exoplanet_classifier` в Model Registry: версия на каждый запуск, alias `champion`
+  автоматически ставится на версию с лучшим `f1_score`
+
+Из признаков модели исключены идентификаторы и колонки, которые выдают ответ (`koi_score`,
+`koi_pdisposition`, `koi_fpflag_*`), иначе качество получается завышенным.
+
+### Предсказание
+
+Приложение загружает модель `models:/kepler_exoplanet_classifier@champion` один раз при старте.
+Если MLflow недоступен, приложение всё равно запускается, а `/process` отвечает 503.
+
+```bash
+curl -X POST http://localhost:8000/process -H 'Content-Type: application/json' \
+  -d '{"features": {"koi_period": 9.488, "koi_prad": 2.26, "koi_depth": 615.8, "koi_teq": 793}}'
+```
+
+В ответе класс (`CONFIRMED`, `CANDIDATE` или `FALSE POSITIVE`), вероятности, версия модели и число
+признаков, которые не были переданы.
+
+Чтобы приложение стало использовать другую версию модели, переключаем alias `champion` в Model
+Registry и перезапускаем приложение (`docker compose restart app`). Код менять не нужно. Работающее
+приложение само новую версию не подхватывает: модель загружается один раз.
 
 ## Тесты и проверки
 
@@ -138,11 +191,17 @@ git push origin v0.1.0
   ci.yml              # CI: форматирование, линтер, тесты
   cd.yml              # CD: сборка и публикация образа
 src/
-  app.py              # создание приложения, /healthz
-  config.py           # версия приложения и DATABASE_URL
+  app.py              # создание приложения, /healthz, загрузка модели при старте
+  config.py           # версия приложения, DATABASE_URL, настройки MLflow
+  features.py         # расчёт признаков, общий для обучения и приложения
+  inference.py        # загрузка модели из MLflow и предсказание
+  train.py            # обучение, регистрация моделей и alias champion
+  run_eda.py          # EDA и графики в MLflow
   api/v1/health.py    # /api/v1/version и /api/v1/health
+  api/process.py      # POST /process
 tests/
-  test_health.py      # тесты эндпоинтов
+  test_health.py      # тесты эндпоинтов здоровья
+  test_process.py     # тесты /process и загрузки модели
 main.py               # локальный запуск
 Dockerfile
 docker-compose.yml
@@ -152,5 +211,14 @@ pyproject.toml        # зависимости, настройки ruff и pytes
 
 ## Конфигурация
 
-Строка подключения к базе задаётся через переменную окружения `DATABASE_URL`,
-по умолчанию `postgresql://postgres:postgres@localhost:5432/exoplanet_classifier`.
+Настройки задаются переменными окружения:
+
+- `DATABASE_URL` - строка подключения к базе, по умолчанию
+  `postgresql://postgres:postgres@localhost:5432/exoplanet_classifier`
+- `MLFLOW_TRACKING_URI` - адрес MLflow, по умолчанию `http://localhost:5000`
+  (в docker compose для приложения `http://mlflow_server:5000`)
+- `MODEL_NAME` и `MODEL_ALIAS` - какая модель загружается, по умолчанию
+  `kepler_exoplanet_classifier` и `champion`
+
+Зависимости разделены на группы: основные нужны приложению и попадают в Docker-образ, группы `dev`
+(проверки) и `train` (EDA и обучение) ставятся командой `uv sync` и в образ не входят.
